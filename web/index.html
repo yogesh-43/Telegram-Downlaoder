@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="color-scheme" content="dark" />
+  <title>TG Saver — Telegram Media Downloader</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Ccircle cx='16' cy='16' r='16' fill='%232AABEE'/%3E%3Cpath d='M8 16.5l12.2-6.2c.6-.3 1.2.4.9 1L18 18.2l-2.2 7.1c-.2.7-1.1.8-1.5.1L12 20l-3.7 2.3c-.6.4-1.3-.2-1.1-.9L8 16.5z' fill='%23fff'/%3E%3C/svg%3E" />
+  <link rel="stylesheet" href="/static/style.css" />
+</head>
+<body>
+  <a class="skip" href="#main">Skip to content</a>
+
+  <div id="auth" class="screen" hidden>
+    <div class="auth-card">
+      <div class="brand">
+        <span class="logo" aria-hidden="true">
+          <svg viewBox="0 0 32 32" width="40" height="40"><circle cx="16" cy="16" r="16" fill="#2AABEE"/><path d="M8 16.5l12.2-6.2c.6-.3 1.2.4.9 1L18 18.2l-2.2 7.1c-.2.7-1.1.8-1.5.1L12 20l-3.7 2.3c-.6.4-1.3-.2-1.1-.9L8 16.5z" fill="#fff"/></svg>
+        </span>
+        <div>
+          <h1>TG Saver</h1>
+          <p>Download media from chats you already belong to.</p>
+        </div>
+      </div>
+
+      <ol class="steps" aria-label="Login steps">
+        <li data-step="api" class="on">1. API</li>
+        <li data-step="phone">2. Phone</li>
+        <li data-step="code">3. Code</li>
+        <li data-step="2fa">4. 2FA</li>
+      </ol>
+
+      <form id="form-api" class="panel">
+        <p class="hint">Create your own app at <a href="https://my.telegram.org/apps" target="_blank" rel="noopener">my.telegram.org/apps</a>, then paste <strong>api_id</strong> and <strong>api_hash</strong>. They stay on this computer and are never uploaded.</p>
+        <label for="api-id">API ID</label>
+        <input id="api-id" name="api_id" inputmode="numeric" required autocomplete="off" placeholder="12345678" />
+        <label for="api-hash">API Hash</label>
+        <input id="api-hash" name="api_hash" required autocomplete="off" placeholder="32-character hash" />
+        <button type="submit">Continue</button>
+      </form>
+
+      <form id="form-phone" class="panel" hidden>
+        <label for="phone">Phone number</label>
+        <input id="phone" name="phone" placeholder="+91 98765 43210" required autocomplete="tel" />
+        <p class="hint">Use the same number as your Telegram account, including the country code.</p>
+        <button type="submit">Send login code</button>
+        <button type="button" class="ghost back" data-back="api">Change API ID / Hash</button>
+      </form>
+
+      <form id="form-code" class="panel" hidden>
+        <label for="code">Login code from Telegram</label>
+        <input id="code" name="code" inputmode="numeric" required autocomplete="one-time-code" placeholder="12345" />
+        <p class="hint">Telegram sends this in the app as a message from the “Telegram” account — not SMS on most accounts.</p>
+        <button type="submit">Verify</button>
+        <button type="button" class="ghost back" data-back="phone">Change phone number</button>
+      </form>
+
+      <form id="form-2fa" class="panel" hidden>
+        <label for="password">Two-factor password</label>
+        <div class="password-wrap">
+          <input id="password" name="password" type="password" required autocomplete="current-password" />
+          <button type="button" id="toggle-password" class="ghost icon-btn" aria-pressed="false">Show</button>
+        </div>
+        <p class="hint">This is the cloud password you set in Telegram Settings → Privacy and Security → Two-Step Verification.</p>
+        <button type="submit">Unlock</button>
+        <button type="button" class="ghost back" data-back="code">Back</button>
+      </form>
+
+      <p id="auth-error" class="error" role="alert" hidden></p>
+    </div>
+  </div>
+
+  <div id="app" class="screen app" hidden>
+    <header class="top">
+      <div class="brand mini">
+        <span class="logo" aria-hidden="true">
+          <svg viewBox="0 0 32 32" width="28" height="28"><circle cx="16" cy="16" r="16" fill="#2AABEE"/><path d="M8 16.5l12.2-6.2c.6-.3 1.2.4.9 1L18 18.2l-2.2 7.1c-.2.7-1.1.8-1.5.1L12 20l-3.7 2.3c-.6.4-1.3-.2-1.1-.9L8 16.5z" fill="#fff"/></svg>
+        </span>
+        <strong>TG Saver</strong>
+      </div>
+      <p id="who" class="who"></p>
+      <button id="btn-logout" class="ghost" type="button">Log out</button>
+    </header>
+
+    <div class="layout">
+      <aside class="sidebar">
+        <label class="search" for="chat-search">
+          <span class="sr">Search chats</span>
+          <input id="chat-search" placeholder="Search groups and topics" />
+        </label>
+        <div id="chat-list" class="chat-list" role="listbox" aria-label="Your chats">
+          <p class="empty">Loading chats…</p>
+        </div>
+      </aside>
+
+      <main id="main">
+        <section class="toolbar">
+          <label class="grow" for="chat-input">Channel, group, or link
+            <input id="chat-input" placeholder="@channel, t.me/…, or -100…" />
+          </label>
+          <label for="scan-limit">Scan limit
+            <input id="scan-limit" type="number" min="20" max="2000" value="300" />
+          </label>
+          <button id="btn-scan" type="button">Fetch media</button>
+        </section>
+
+        <div class="filters" role="group" aria-label="Media types">
+          <label><input type="checkbox" name="kind" value="video" checked /> Video</label>
+          <label><input type="checkbox" name="kind" value="photo" checked /> Photo</label>
+          <label><input type="checkbox" name="kind" value="audio" checked /> Audio</label>
+          <label><input type="checkbox" name="kind" value="document" checked /> Files</label>
+          <label><input type="checkbox" name="kind" value="voice" /> Voice</label>
+          <label><input type="checkbox" name="kind" value="gif" /> GIF</label>
+        </div>
+
+        <div class="select-bar">
+          <label><input id="select-all" type="checkbox" /> Select all</label>
+          <span id="selection-label">0 selected</span>
+          <button id="btn-download" type="button" disabled>Download selected</button>
+        </div>
+
+        <p id="scan-status" class="hint"></p>
+        <div id="media-grid" class="grid">
+          <div class="empty-card">
+            <strong>No media yet</strong>
+            <p>Pick a chat on the left, or paste a link, then click Fetch media.</p>
+          </div>
+        </div>
+      </main>
+
+      <section class="queue-pane" aria-labelledby="queue-title">
+        <div class="queue-head">
+          <h2 id="queue-title">Downloads</h2>
+          <button id="btn-settings" class="ghost" type="button">Settings</button>
+        </div>
+        <div id="queue-list" class="queue-list">
+          <p class="hint">In-progress files show here. Finished files are written to your hard disk.</p>
+        </div>
+        <div class="local-head">
+          <div>
+            <h2 id="local-title">Hard disk</h2>
+            <p id="save-path" class="hint"></p>
+            <p id="save-count" class="hint"></p>
+          </div>
+          <button id="btn-open-folder" class="ghost" type="button">Open folder</button>
+        </div>
+      </section>
+    </div>
+  </div>
+
+  <dialog id="settings">
+    <form method="dialog" id="form-settings">
+      <h2>Settings</h2>
+      <label for="download-dir">Save files to this folder</label>
+      <input id="download-dir" />
+      <label for="concurrency">Parallel downloads (1–8)</label>
+      <input id="concurrency" type="number" min="1" max="8" />
+      <label class="check">
+        <input id="prefix-date" type="checkbox" />
+        Prefix filenames with publication date
+      </label>
+      <menu>
+        <button value="cancel" class="ghost">Close</button>
+        <button id="save-settings" value="default">Save</button>
+      </menu>
+    </form>
+  </dialog>
+
+  <script src="/static/app.js"></script>
+</body>
+</html>
